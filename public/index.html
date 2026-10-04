@@ -538,7 +538,9 @@ function renderLobby(){
   const pend = pendingPay();
   $("resumeBtn").hidden = !pend;
   $("freeBtn").hidden = S.freeAvailable !== true;
-  $("payBtn").hidden = S.freeAvailable === true || !!pend;
+  // SOL mode: players can skip the free practice game and pay straight away
+  $("payBtn").hidden = !!pend || (S.freeAvailable === true && MODE !== "sol");
+  if(MODE==="sol" && S.freeAvailable===true) $("payBtn").textContent = `SKIP PRACTICE · PAY ${entrySol()} SOL & PLAY`;
   if(MODE==="sol"){
     const low = S.sol!=null && S.sol < entrySol()+0.00002;
     $("payBtn").disabled = S.busy || low;
@@ -717,6 +719,8 @@ hold("tl","ArrowLeft"); hold("tr","ArrowRight"); hold("th","ArrowUp"); hold("tf"
 const ship = { x:0,y:0, a:-Math.PI/2, vx:0,vy:0, live:true, inv:0, horn:1 };
 let rocks=[], shots=[], dust=[], shards=[], pops=[], ufos=[], score=0, lives=3, wave=1, fireWait=0, ufoTimer=0, extraAt=10000;
 const MAX_SHIPS = 5;                       // extra ships stop at 5
+// UFOs per visit: wave 1 none, waves 2-4 one, waves 5-10 two, then one more each wave (11: 3, 12: 4) up to 5 from wave 13
+const ufoCount = w => w < 5 ? 1 : w <= 10 ? 2 : Math.min(5, w - 8);
 
 function wrap(o){ if(o.x<0) o.x+=W; if(o.x>W) o.x-=W; if(o.y<0) o.y+=H; if(o.y>H) o.y-=H; }
 
@@ -844,11 +848,11 @@ function update(){
   ufoTimer++;
   if(!ufos.length && ufoTimer>900 && wave>1){
     ufoTimer=0;
-    const count = wave>=10 ? 2 : 1;        // double UFOs from wave 10
+    const count = ufoCount(wave);
     const dir = Math.random()<0.5 ? 1 : -1;
     for(let i=0;i<count;i++){
-      const d = i===0 ? dir : -dir;        // the second one comes from the other side
-      ufos.push({x: d>0?0:W, y:40+Math.random()*(H-80), vx:1.4*d, cool:40+i*35});
+      const d = i%2===0 ? dir : -dir;      // alternate sides so they cross the screen
+      ufos.push({x: d>0?0:W, y:40+((i+Math.random())/count)*(H-80), vx:1.4*d, cool:40+i*35});
     }
   }
   for(const u of ufos){
