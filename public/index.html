@@ -79,6 +79,11 @@
   /* points mode (default until the BIT pool launches) hides the BIT entry/pot UI; bit mode hides the points UI */
   body.mode-points .bitmode{display:none!important}
   body:not(.mode-points) .ptsmode{display:none!important}
+  body:not(.mode-sol) .solmode{display:none!important}
+  body.mode-sol .bitonly{display:none!important}
+  .pots2 small.end{margin-top:4px;font-size:9px}
+  #sPay div{font-size:11px;padding:4px 0;border-bottom:1px dashed rgba(107,68,35,.5)}
+  #sPay a{color:var(--gold2)}
   .backlink{color:var(--gold);text-decoration:none;border:1px solid var(--wood);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:bold;white-space:nowrap}
   .backlink:hover{border-color:var(--gold);background:rgba(245,197,66,.1)}
   .toplinks{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin:0 0 10px}
@@ -125,7 +130,7 @@
 
     <div class="card bitmode" id="walletCard" hidden>
       <div class="row"><span>Wallet</span><b id="wAddr">—</b></div>
-      <div class="row"><span>RumpleBits</span><b id="wBits">—</b></div>
+      <div class="row bitonly"><span>RumpleBits</span><b id="wBits">—</b></div>
       <div class="row"><span>SOL (for fees)</span><b id="wSol">—</b></div>
     </div>
 
@@ -141,12 +146,12 @@
       <button id="freeBtn" class="big hot bitmode" hidden>PLAY · 1ST GAME FREE</button>
       <button id="resumeBtn" class="big hot bitmode" hidden>RESUME MY PAID GAME</button>
       <button id="payBtn" class="big hot bitmode" hidden>PAY 1000 RUMPLEBITS &amp; PLAY</button>
-      <button id="swapBtn" class="big mag bitmode">GET RUMPLEBITS · SWAP</button>
+      <button id="swapBtn" class="big mag bitmode bitonly">GET RUMPLEBITS · SWAP</button>
       <button id="discBtn" class="link" hidden>disconnect wallet</button>
     </div>
     <div id="msg"></div>
 
-    <div class="card pot bitmode">
+    <div class="card pot bitmode bitonly">
       <h3>THIS WEEK'S POT</h3>
       <div class="amt"><span id="potAmt">—</span></div>
       <small><span id="potEntries">0</span> paid entries · top score takes <span id="potPct">90</span>%<br>resets Monday 00:00 UTC · week <span id="potWeek">—</span></small>
@@ -160,7 +165,27 @@
       <small style="color:var(--mute);display:block;margin-top:8px">Daily top 3 split today's pot 50/30/20 · monthly top 10 split the month's pot. <a href="https://rumplebitskin.com/#leaderboards">All leaderboards</a></small>
     </div>
 
-    <div class="card bitmode">
+    <div class="card solmode">
+      <h3>ASTROBIT SOL POTS</h3>
+      <div class="pots2"><div><small>TODAY'S POT</small><b id="sPotD">—</b><small class="end" id="sEndD"></small></div><div><small>THIS MONTH'S POT</small><b id="sPotM">—</b><small class="end" id="sEndM"></small></div></div>
+      <small style="color:var(--mute);display:block;line-height:1.5"><span id="sEntry">0.001</span> SOL per game · <span id="sPcts">60% to today's pot, 30% to the month's pot, 10% to Rumplebitskin</span> · top 3 split each pot 50/30/20, paid automatically after the day or month ends.</small>
+    </div>
+    <div class="card solmode">
+      <h3>TOP PILOTS · TODAY</h3>
+      <table><thead><tr><th>#</th><th>Pilot</th><th style="text-align:right">Score</th><th style="text-align:right">Wins now</th></tr></thead>
+      <tbody id="sLbD"><tr><td colspan="4" style="color:var(--mute)">No paid scores yet today — be the first.</td></tr></tbody></table>
+    </div>
+    <div class="card solmode">
+      <h3>TOP PILOTS · THIS MONTH</h3>
+      <table><thead><tr><th>#</th><th>Pilot</th><th style="text-align:right">Score</th><th style="text-align:right">Wins now</th></tr></thead>
+      <tbody id="sLbM"><tr><td colspan="4" style="color:var(--mute)">No paid scores yet this month.</td></tr></tbody></table>
+    </div>
+    <div class="card solmode">
+      <h3>RECENT PAYOUTS</h3>
+      <div id="sPay"><div style="color:var(--mute)">No payouts yet.</div></div>
+    </div>
+
+    <div class="card bitmode bitonly">
       <h3>TOP PILOTS · THIS WEEK</h3>
       <table><thead><tr><th>#</th><th>Wallet</th><th>Wave</th><th style="text-align:right">Score</th></tr></thead>
       <tbody id="lb"><tr><td colspan="4" style="color:var(--mute)">No scores yet — be the first.</td></tr></tbody></table>
@@ -169,7 +194,8 @@
     <p class="help">Fly the crescent moon. Bits fire from each horn in turn. Blast the RumpleBits wheels — big wheels split, small wheels shatter into tiny pieces.<br>
       ← → rotate · ↑ / W thrust · SPACE fire · H hyperspace</p>
     <p class="fine ptsmode">5 free plays a day. Scores earn Rumplebits points and fill AstroBit's daily and monthly pots, paid out automatically. Rumplebits points may be converted to RumpleBits (BIT) tokens in the future. BIT entry and a weekly BIT pot are coming when BIT launches.</p>
-    <p class="fine bitmode">Each game costs 1000 RumpleBits; your first game per wallet is free. Weekly pot is paid by Rumplebitskin to the top score after review — tampered or impossible scores are removed. Free games count on the leaderboard. Crypto games may be restricted where you live; play only where legal.</p>
+    <p class="fine solmode">Each game costs 0.001 SOL plus a tiny network fee; your first game per wallet is a free practice run and can't win SOL. Only paid games count for the pots. Days and months follow Central Time (Chicago). Scores that look impossible are held and never paid. Pots with no paid scores, or prizes too small to open a brand-new wallet, roll into the next pot. 18+ only, and only where skill games for prizes are legal for you. Not financial advice.</p>
+    <p class="fine bitmode bitonly">Each game costs 1000 RumpleBits; your first game per wallet is free. Weekly pot is paid by Rumplebitskin to the top score after review — tampered or impossible scores are removed. Free games count on the leaderboard. Crypto games may be restricted where you live; play only where legal.</p>
   </div>
 </div>
 
@@ -269,11 +295,35 @@ async function rpc(method, params){
   return j.result;
 }
 
+// Wallet Standard: newer wallets (and Brave setups that hide Phantom) announce themselves this way
+const STD=[];
+(function(){
+  const api={register:(...ws)=>{ ws.forEach(w=>{ try{ if(w?.features?.["standard:connect"] && w.features["solana:signTransaction"] && !STD.includes(w)) STD.push(w); }catch(e){} }); return ()=>{}; }};
+  try{ window.addEventListener("wallet-standard:register-wallet", ev=>{ try{ ev.detail(api); }catch(e){} }); }catch(e){}
+  try{ window.dispatchEvent(new CustomEvent("wallet-standard:app-ready",{detail:api})); }catch(e){}
+})();
+function stdAdapter(w){
+  if(w.__ab) return w.__ab;
+  let account=null;
+  const chain=()=>"solana:mainnet";
+  const a={
+    publicKey:null,
+    async connect(opts){ const r=await w.features["standard:connect"].connect(opts&&opts.onlyIfTrusted?{silent:true}:undefined); const accs=(r?.accounts?.length?r.accounts:w.accounts)||[];
+      if(!accs.length) throw new Error("The wallet returned no accounts"); account=accs[0]; a.publicKey=new W3.PublicKey(account.address); return {publicKey:a.publicKey}; },
+    async signTransaction(tx){ const out=await w.features["solana:signTransaction"].signTransaction({account, transaction:tx.serialize({requireAllSignatures:false,verifySignatures:false}), chain:chain()});
+      const f=Array.isArray(out)?out[0]:out; return W3.Transaction.from(f.signedTransaction); },
+    async signMessage(bytes){ const f=w.features["solana:signMessage"]; if(!f) throw new Error("This wallet can't sign messages");
+      const out=await f.signMessage({account, message:bytes}); const r=Array.isArray(out)?out[0]:out; return {signature:r.signature}; },
+    async disconnect(){ try{ await w.features["standard:disconnect"]?.disconnect(); }catch(e){} },
+  };
+  w.__ab=a; return a;
+}
 function detectWallets(){
   const list=[];
   if(window.phantom?.solana?.isPhantom) list.push({name:"Phantom", p:window.phantom.solana});
   if(window.solflare?.isSolflare) list.push({name:"Solflare", p:window.solflare});
   if(window.backpack?.isBackpack) list.push({name:"Backpack", p:window.backpack});
+  STD.forEach(w=>{ if(!list.some(x=>x.name.toLowerCase()===String(w.name).toLowerCase())) list.push({name:w.name, p:stdAdapter(w)}); });
   if(!list.length && window.solana) list.push({name:"Solana Wallet", p:window.solana});
   return list;
 }
@@ -419,9 +469,12 @@ async function refresh(){
     const st = await api("status"+(S.pk?"?wallet="+S.pk:""));
     if(st.config) CFG = {...CFG, ...st.config};
     S.freeAvailable = st.freeAvailable;
-    renderPot(st);
+    if(MODE==="sol") renderSol(st); else renderPot(st);
   }catch(e){ if(!DEV) msg(e.message,"err"); }
-  if(S.pk){
+  if(S.pk && MODE==="sol"){
+    try{ const bal = await rpc("getBalance",[S.pk,{commitment:"confirmed"}]); S.sol = bal.value/1e9; }
+    catch(e){ msg("Could not read your SOL balance: "+e.message,"err"); }
+  } else if(S.pk){
     try{
       await loadMint();
       const [accs, bal] = await Promise.all([tokenAccounts(), rpc("getBalance",[S.pk,{commitment:"confirmed"}])]);
@@ -445,6 +498,26 @@ function renderPot(st){
     <td>${r.wave}</td><td class="s">${fmt(r.score)}</td></tr>`).join("");
 }
 
+const solTxt = l => l==null ? "—" : (l/1e9).toLocaleString(undefined,{maximumFractionDigits:4})+" SOL";
+const entrySol = () => (CFG.entryLamports||1000000)/1e9;
+function untilTxt(t){ if(!t) return ""; const s=Math.max(0,Math.round((t-Date.now())/1000)), h=Math.floor(s/3600), m=Math.floor(s%3600/60);
+  return h>=48 ? "ends in "+Math.round(h/24)+" days" : h>=1 ? `ends in ${h}h ${m}m` : `ends in ${m}m`; }
+function renderSol(st){
+  $("sPotD").textContent = solTxt(st.today.potLamports);
+  $("sPotM").textContent = solTxt(st.month.potLamports);
+  $("hudPot").textContent = solTxt(st.today.potLamports);
+  $("sEndD").textContent = untilTxt(st.today.endsAt) + " · " + st.today.entries + " paid";
+  $("sEndM").textContent = untilTxt(st.month.endsAt) + " · " + st.month.entries + " paid";
+  $("sEntry").textContent = entrySol();
+  $("sPcts").textContent = `${st.config.dailyPct}% to today's pot, ${st.config.monthlyPct}% to the month's pot, ${st.config.housePct}% to Rumplebitskin`;
+  const rows = (lb, empty) => !lb.length ? `<tr><td colspan="4" style="color:var(--mute)">${empty}</td></tr>` :
+    lb.map((r,i)=>`<tr class="${r.wallet===S.pk?"me":""}"><td class="n">${i+1}</td><td title="${r.wallet}">${short(r.wallet)}</td><td class="s">${fmt(r.score)}</td><td class="s">${r.winsLamports?solTxt(r.winsLamports):"—"}</td></tr>`).join("");
+  $("sLbD").innerHTML = rows(st.today.leaderboard, "No paid scores yet today — be the first.");
+  $("sLbM").innerHTML = rows(st.month.leaderboard, "No paid scores yet this month.");
+  $("sPay").innerHTML = !st.payouts?.length ? `<div style="color:var(--mute)">No payouts yet.</div>` :
+    st.payouts.map(p=>`<div>${p.kind==="day"?"Day":"Month"} ${p.period}: ${p.winners.map(w=>short(w.wallet)+" "+solTxt(w.lamports)).join(" · ")} · <a target="_blank" rel="noopener" href="https://solscan.io/tx/${p.sig}">tx</a></div>`).join("");
+}
+
 function pendingPay(){ try{ const p=JSON.parse(localStorage.getItem("astrobit_pending")||"null"); return p && p.wallet===S.pk ? p : null; }catch(e){ return null; } }
 function setPending(v){ try{ v ? localStorage.setItem("astrobit_pending",JSON.stringify(v)) : localStorage.removeItem("astrobit_pending"); }catch(e){} }
 
@@ -454,7 +527,8 @@ function renderLobby(){
   $("connectBtn").hidden = on;
   $("walletCard").hidden = !on;
   $("discBtn").hidden = !on;
-  $("payBtn").textContent = `PAY ${fmt(CFG.entry)} RUMPLEBITS & PLAY`;
+  $("payBtn").textContent = MODE==="sol" ? `PAY ${entrySol()} SOL & PLAY` : `PAY ${fmt(CFG.entry)} RUMPLEBITS & PLAY`;
+  $("freeBtn").textContent = MODE==="sol" ? "PLAY · 1ST GAME FREE (PRACTICE)" : "PLAY · 1ST GAME FREE";
   $("chip").hidden = !on; $("chip").textContent = on ? "● "+short(S.pk) : "";
   if(!on){ ["freeBtn","payBtn","resumeBtn"].forEach(id=>$(id).hidden=true); return; }
   $("wAddr").textContent = short(S.pk); $("wAddr").title = S.pk;
@@ -464,6 +538,12 @@ function renderLobby(){
   $("resumeBtn").hidden = !pend;
   $("freeBtn").hidden = S.freeAvailable !== true;
   $("payBtn").hidden = S.freeAvailable === true || !!pend;
+  if(MODE==="sol"){
+    const low = S.sol!=null && S.sol < entrySol()+0.00002;
+    $("payBtn").disabled = S.busy || low;
+    if(S.freeAvailable===false && low && !pend) msg(`You need about ${entrySol()+0.00002} SOL to play.`,"info");
+    return;
+  }
   $("payBtn").disabled = S.busy || (S.bits!=null && S.bits < CFG.entry);
   if(S.freeAvailable===false && S.bits!=null && S.bits < CFG.entry && !pend)
     msg(`You need ${fmt(CFG.entry)} RumpleBits to play — tap SWAP to get some.`,"info");
@@ -490,7 +570,22 @@ function u64le(n){ const b=new Uint8Array(8); new DataView(b.buffer).setBigUint6
 function ata(owner, mint, prog){
   return W3.PublicKey.findProgramAddressSync([owner.toBytes(), prog.toBytes(), mint.toBytes()], new W3.PublicKey(ATA_PROG))[0];
 }
+async function buildSolEntryTx(){
+  const {PublicKey, Transaction, TransactionInstruction} = W3;
+  const owner = new PublicKey(S.pk);
+  const sys = new PublicKey("11111111111111111111111111111111");
+  const transfer = (to, lamports) => { const d=new Uint8Array(12); const v=new DataView(d.buffer); v.setUint32(0,2,true); v.setBigUint64(4,BigInt(lamports),true);
+    return new TransactionInstruction({programId:sys, data:d, keys:[{pubkey:owner,isSigner:true,isWritable:true},{pubkey:new PublicKey(to),isSigner:false,isWritable:true}]}); };
+  const tx = new Transaction();
+  tx.add(transfer(CFG.potWallet, CFG.potLamports));
+  if(CFG.houseLamports>0) tx.add(transfer(CFG.houseWallet, CFG.houseLamports));
+  tx.add(new TransactionInstruction({programId:new PublicKey(MEMO_PROG), data:new TextEncoder().encode("Rumple's AstroBit entry"), keys:[{pubkey:owner,isSigner:true,isWritable:false}]}));
+  const bh = await rpc("getLatestBlockhash",[{commitment:"confirmed"}]);
+  tx.recentBlockhash = bh.value.blockhash; tx.feePayer = owner;
+  return tx;
+}
 async function buildEntryTx(){
+  if(MODE==="sol") return buildSolEntryTx();
   await loadMint();
   const {PublicKey, Transaction, TransactionInstruction, SystemProgram} = W3;
   const owner = new PublicKey(S.pk), mint = new PublicKey(CFG.mint), pot = new PublicKey(CFG.potWallet);
@@ -545,10 +640,11 @@ async function claimPaid(sig){
 $("payBtn").onclick = async ()=>{
   if(S.busy) return; S.busy=true; renderLobby();
   try{
-    if(S.sol!=null && S.sol < 0.003) throw new Error("You need a little SOL (about 0.003) for network fees.");
+    if(MODE==="sol"){ if(S.sol!=null && S.sol < entrySol()+0.00002) throw new Error(`You need about ${entrySol()+0.00002} SOL to play.`); }
+    else if(S.sol!=null && S.sol < 0.003) throw new Error("You need a little SOL (about 0.003) for network fees.");
     msg("Building your entry…");
     const tx = await buildEntryTx();
-    msg(`Approve ${fmt(CFG.entry)} RumpleBits in your wallet…`);
+    msg(MODE==="sol" ? `Approve ${entrySol()} SOL in your wallet…` : `Approve ${fmt(CFG.entry)} RumpleBits in your wallet…`);
     let sig;
     if(S.provider.signAndSendTransaction){
       const r = await S.provider.signAndSendTransaction(tx);
@@ -899,8 +995,9 @@ async function gameOver(){
     msg("Saving your score…");
     try{
       const r = await api("score",{ticket, score, wave});
-      if(r.flagged) msg("Score held for review.","err");
-      else msg(`Score saved! You're #${r.rank} this week (best ${fmt(r.best)}).`,"ok");
+      if(r.practice) msg("Practice game done! Paid games (0.001 SOL) compete for the daily and monthly pots.","ok");
+      else if(r.flagged) msg("Score held for review.","err");
+      else msg(`Score saved! You're #${r.rank} ${r.period==="today"?"today":"this week"} (best ${fmt(r.best)}).`,"ok");
     }catch(e){ msg("Could not save score: "+e.message,"err"); }
   } else if(DEV) msg("Test mode — score not saved.","info");
   refresh();
@@ -918,15 +1015,16 @@ if(DEV){
 window.addEventListener("error", e=>{ if(e.filename && !e.filename.includes(location.host)) return; try{ msg("Something went wrong: "+(e.message||"error")+" — please refresh.","err"); }catch(x){} });
 function applyMode(){
   document.body.classList.toggle("mode-points", MODE==="points");
+  document.body.classList.toggle("mode-sol", MODE==="sol");
   if(MODE==="points"){ $("payBtn").hidden=true; $("freeBtn").hidden=true; $("resumeBtn").hidden=true; }
 }
-{ const q = new URLSearchParams(location.search).get("mode"); if(q==="bit"||q==="points") MODE=q; }
+{ const q = new URLSearchParams(location.search).get("mode"); if(q==="bit"||q==="points"||q==="sol") MODE=q; }
 applyMode(); refresh();
 if(!new URLSearchParams(location.search).get("mode")) (async ()=>{
   const ctl = new AbortController(); const tm = setTimeout(()=>ctl.abort(), 3000);
   try{
     const r = await fetch(API+"/status",{signal:ctl.signal}); const st = await r.json();
-    if(st && st.config && st.config.mode==="bit" && MODE!=="bit"){ MODE="bit"; applyMode(); refresh(); }
+    if(st && st.config && (st.config.mode==="bit"||st.config.mode==="sol") && MODE!==st.config.mode){ MODE=st.config.mode; applyMode(); refresh(); }
   }catch(e){ /* no server or slow: stay in free-play */ }
   finally{ clearTimeout(tm); }
 })();

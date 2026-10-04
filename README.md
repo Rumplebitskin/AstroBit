@@ -2,14 +2,34 @@
 
 Asteroids-style Solana game by Rumplebitskin, live at **bit.rumplebitskin.com**.
 
-**Two modes** (Netlify setting `ASTROBIT_MODE`):
-- `points` (default, use now): players sign in with their wallet through Rumple's Den, get **5 free plays a day**, and scores
-  earn **Rumplebits points** that fill AstroBit's **daily and monthly pots** (paid automatically, shown on rumplebitskin.com).
-- `bit` (later, once BIT has a liquidity pool): 1st game free, then **1000 BIT** per game into a weekly pot (90% to the top score).
+**Three modes** (Netlify setting `ASTROBIT_MODE`):
+- `sol` (default): **0.001 SOL per game** (1st game per wallet is a free practice run). Each entry sends 90% to the pot wallet and
+  10% to Rumplebitskin in one transaction. 60% of every entry fills **today's pot**, 30% fills **this month's pot**. The top 3 paid
+  scores split each pot 50/30/20, **paid automatically** by `netlify/functions/payout.mjs` (runs hourly, pays a day/month 45 minutes
+  after it ends, Central Time). Pots with no paid scores roll over. Each pot is paid at most once.
+- `points`: plays through Rumple's Den points (5 free plays a day).
+- `bit`: 1000 BIT entry + weekly BIT pot (later, once BIT has a liquidity pool).
+
+### SOL mode settings
+| Name | Needed? | What |
+|---|---|---|
+| `POT_SECRET_KEY` | **Yes, for payouts** (mark as secret) | The pot wallet's private key (Phantom: Settings → Manage accounts → the pot account → Show private key). Payouts stop if it doesn't match `SOL_POT_WALLET`. |
+| `SOLANA_RPC` | Recommended | Your Helius mainnet URL. The public RPC rate-limits. |
+| `ADMIN_KEY` | Recommended | Long secret. `/api/admin?key=…` shows pots, payouts, carry and flagged scores; `&run=payouts` runs payouts now. |
+| `SOL_POT_WALLET` | Optional | Default `PotsipNmNoagBnJLm3KT2ti41tJ8DGZVu3mP1hph6dc` |
+| `HOUSE_WALLET` | Optional | Default `RumpP3uH3vgy3nEfdy8CzTSBPP8ydzKgLm24aZANHTG` |
+| `SOL_ENTRY_LAMPORTS` | Optional | Default `1000000` (0.001 SOL) |
+| `HOUSE_PCT` / `DAILY_PCT` | Optional | Defaults `10` / `60` (monthly gets the rest, 30) |
+| `DAILY_SPLIT` / `MONTHLY_SPLIT` | Optional | Default `50,30,20` (must add up to 100) |
+| `POT_TIMEZONE` | Optional | Default `America/Chicago` |
+| `PAYOUTS` | Optional | `off` pauses automatic payouts (entries still count) |
+| `PAYOUT_MAX_SOL` | Optional | Safety cap per payout, default `5`. Bigger pots are held for you to check in /api/admin. |
 
 ## What's in here
 - `public/index.html` — the game (RumpleBits wheel asteroids, wallet connect, entry payment, Jupiter swap, leaderboard)
-- `netlify/functions/api.mjs` — backend: free-game claims, on-chain entry check, scores, weekly pot, RPC proxy, admin view
+- `netlify/functions/api.mjs` — backend: free-game claims, on-chain entry check, scores, pots, RPC proxy, admin view
+- `netlify/functions/payout.mjs` — hourly job that pays closed SOL pots
+- `netlify/lib/solpot.mjs` — SOL entry checks, pot ledger and payouts
 - `netlify.toml`, `package.json` — Netlify config + dependencies (Netlify Blobs is the database; no extra account needed)
 
 ## Deploy (functions need Git or the CLI — drag-and-drop won't run the backend)

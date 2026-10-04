@@ -10,6 +10,7 @@
 import { getStore } from "@netlify/blobs";
 import nacl from "tweetnacl";
 import bs58 from "bs58";
+import { SOL, solStatus, verifySolEntry, recordEntry, recordScore, board, dayId, solAdmin, runPayouts } from "../lib/solpot.mjs";
 
 const env = (k, d) => (globalThis.Netlify?.env?.get(k) ?? process.env[k] ?? d);
 
@@ -20,8 +21,9 @@ const CFG = {
   potShare: Number(env("POT_SHARE", "0.9")),         // share of entries paid to weekly winner
   rpc: env("SOLANA_RPC", "https://api.mainnet-beta.solana.com"),
   symbol: "RumpleBits",
-  // "points" (default): AstroBit plays through Rumple's Den points. "bit": 1000 BIT entry + weekly BIT pot.
-  mode: env("ASTROBIT_MODE", "points") === "bit" ? "bit" : "points",
+  // "sol" (default): 0.001 SOL entry, daily + monthly SOL pots paid automatically (see ../lib/solpot.mjs).
+  // "points": plays through Rumple's Den points. "bit": 1000 BIT entry + weekly BIT pot.
+  mode: ["points", "bit", "sol"].includes(env("ASTROBIT_MODE", "sol")) ? env("ASTROBIT_MODE", "sol") : "sol",
 };
 
 const RPC_ALLOW = new Set([
@@ -93,10 +95,11 @@ async function status(req) {
   const url = new URL(req.url);
   const wallet = url.searchParams.get("wallet");
   const db = store();
-  const week = weekId();
-  const [lb, pot] = await Promise.all([leaderboard(db, week), potInfo(db, week)]);
   let freeAvailable = null;
   if (wallet && validWallet(wallet)) freeAvailable = !(await db.get(`free/${wallet}`));
+  if (CFG.mode === "sol") return json({ ...(await solStatus(db, wallet)), freeAvailable });
+  const week = weekId();
+  const [lb, pot] = await Promise.all([leaderboard(db, week), potInfo(db, week)]);
   return json({
     config: { mode: CFG.mode, mint: CFG.mint, potWallet: CFG.potWallet, entry: CFG.entry, potShare: CFG.potShare, symbol: CFG.symbol },
     week, ...pot, freeAvailable,
@@ -164,11 +167,12 @@ async function start(req) {
     if (t && !t.used) return json({ ticket: t.id, kind: "paid", resumed: true });
     return json({ error: "That entry was already played" }, 409);
   }
-  const err = await verifyEntryTx(tx, wallet);
+  const err = CFG.mode === "sol" ? await verifySolEntry(tx, wallet) : await verifyEntryTx(tx, wallet);
   if (err) return json({ error: err }, 400);
-  const t = await issueTicket(db, wallet, "paid", { tx });
+  const t = await issueTicket(db, wallet, "paid", { tx, mode: CFG.mode });
   await db.setJSON(`tx/${tx}`, { wallet, ticket: t.id, time: Date.now() });
-  await db.setJSON(`entry/${t.week}/${tx}`, { wallet, ticket: t.id, time: Date.now() });
+  if (CFG.mode === "sol") await recordEntry(db, { sig: tx, wallet, ticket: t.id, time: t.created });
+  else await db.setJSON(`entry/${t.week}/${tx}`, { wallet, ticket: t.id, time: Date.now() });
   return json({ ticket: t.id, kind: "paid" });
 }
 
@@ -186,6 +190,16 @@ async function score(req) {
   const flagged = s > secs * 90 + 1500 || w > secs / 4 + 2;
   t.used = true; t.score = s; t.wave = w; t.ended = Date.now(); t.flagged = flagged;
   await db.setJSON(`ticket/${ticket}`, t);
+  if (t.mode === "sol" || (CFG.mode === "sol" && t.kind === "free")) {
+    const row = { wallet: t.wallet, score: s, wave: w, time: Date.now(), secs: Math.round(secs), ticket };
+    if (t.kind !== "paid") return json({ ok: true, practice: true, flagged: false });
+    const late = Date.now() - t.created > SOL.maxGameMs;
+    if (flagged || late) { await db.setJSON(`sol/flag/${dayId(t.created)}/${ticket}`, { ...row, late }); return json({ ok: true, flagged: true }); }
+    await recordScore(db, t, row);
+    const lb = await board(db, "day", dayId(t.created));
+    const rank = lb.findIndex(r => r.wallet === t.wallet) + 1;
+    return json({ ok: true, flagged: false, rank, best: lb[rank - 1]?.score ?? s, period: "today" });
+  }
   const week = weekId(new Date(t.created));
   const row = { wallet: t.wallet, score: s, wave: w, kind: t.kind, tx: t.tx || null, time: Date.now(), secs: Math.round(secs) };
   await db.setJSON(`${flagged ? "flag" : "score"}/${week}/${ticket}`, row);
@@ -207,8 +221,12 @@ async function admin(req) {
   const url = new URL(req.url);
   const key = env("ADMIN_KEY", "");
   if (!key || url.searchParams.get("key") !== key) return json({ error: "Unauthorized" }, 401);
-  const week = url.searchParams.get("week") || weekId();
   const db = store();
+  if (CFG.mode === "sol") {
+    if (url.searchParams.get("run") === "payouts") return json({ log: await runPayouts() });
+    return json(await solAdmin(db));
+  }
+  const week = url.searchParams.get("week") || weekId();
   const { blobs } = await db.list({ prefix: `score/${week}/` });
   const scores = (await Promise.all(blobs.map(b => db.get(b.key, { type: "json" })))).filter(Boolean)
     .sort((a, b) => b.score - a.score);

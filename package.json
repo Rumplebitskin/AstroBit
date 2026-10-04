@@ -5,6 +5,7 @@
   "dependencies": {
     "@netlify/blobs": "^8.1.0",
     "bs58": "^6.0.0",
-    "tweetnacl": "^1.0.3"
+    "tweetnacl": "^1.0.3",
+    "@solana/web3.js": "^1.98.0"
   }
 }
