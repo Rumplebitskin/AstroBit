@@ -846,7 +846,8 @@ function update(){
   if(rocks.length===0 && ship.live){ wave++; sfxWave(); pops.push({x:W/2,y:H/2,t:"WAVE "+wave,life:80,big:true}); spawnWave(3+Math.min(wave,8)); }
 
   ufoTimer++;
-  if(!ufos.length && ufoTimer>900 && wave>1){
+  // no new UFOs once 5 or fewer wheel pieces are left (stops farming UFOs by leaving one piece alive)
+  if(!ufos.length && ufoTimer>900 && wave>1 && rocks.length>5){
     ufoTimer=0;
     const count = ufoCount(wave);
     const dir = Math.random()<0.5 ? 1 : -1;
