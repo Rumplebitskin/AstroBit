@@ -1,9 +1,11 @@
 // Rumple's AstroBit — SOL entry + daily/monthly pots with automatic payouts.
 //
 // Every paid game sends ENTRY (default 0.001 SOL) in ONE transaction, split two ways:
-//   - HOUSE_PCT  (default 10%) -> HOUSE_WALLET   (Rumplebitskin)
-//   - the rest   (default 90%) -> SOL_POT_WALLET (pot wallet, used only for prizes)
+//   - HOUSE_PCT  (default 9%)  -> HOUSE_WALLET   (site upkeep)
+//   - the rest   (default 91%) -> SOL_POT_WALLET (pot wallet: prizes + payout fees)
 // The pot share is booked as DAILY_PCT (60% of the entry) to that day's pot and MONTHLY_PCT (30%) to that month's pot.
+// FEE_RESERVE_PCT (default 1%) is never booked to a pot: it stays in the pot wallet to pay the payout network fees,
+// so the wallet grows very slowly instead of shrinking (one payout costs 0.000005 SOL; one game keeps 0.00001 SOL).
 // Days and months follow POT_TIMEZONE (default America/Chicago). Top 3 paid scores split each pot 50/30/20.
 // A scheduled function (payout.mjs) pays closed days/months from the pot wallet, signed with POT_SECRET_KEY.
 // Free games are practice only and never win SOL.
@@ -18,9 +20,10 @@ export const env = (k, d) => (globalThis.Netlify?.env?.get(k) ?? process.env[k] 
 const int = (v, d) => { const n = Math.floor(Number(v)); return Number.isFinite(n) ? n : d; };
 
 const ENTRY = int(env("SOL_ENTRY_LAMPORTS", "1000000"), 1000000);
-const HOUSE_PCT = int(env("HOUSE_PCT", "10"), 10);
+const HOUSE_PCT = int(env("HOUSE_PCT", "9"), 9);
 const DAILY_PCT = int(env("DAILY_PCT", "60"), 60);
-const MONTHLY_PCT = 100 - HOUSE_PCT - DAILY_PCT;
+const RESERVE_PCT = Math.max(0, int(env("FEE_RESERVE_PCT", "1"), 1));
+const MONTHLY_PCT = 100 - HOUSE_PCT - DAILY_PCT - RESERVE_PCT;
 const parseSplit = (s, d) => { const a = String(s || "").split(",").map(Number).filter((x) => x > 0); return a.length && a.reduce((x, y) => x + y, 0) === 100 ? a : d; };
 
 export const SOL = {
@@ -30,8 +33,9 @@ export const SOL = {
   houseLamports: Math.floor((ENTRY * HOUSE_PCT) / 100),
   potLamports: ENTRY - Math.floor((ENTRY * HOUSE_PCT) / 100),
   dailyLamports: Math.floor((ENTRY * DAILY_PCT) / 100),
-  monthlyLamports: ENTRY - Math.floor((ENTRY * HOUSE_PCT) / 100) - Math.floor((ENTRY * DAILY_PCT) / 100),
-  housePct: HOUSE_PCT, dailyPct: DAILY_PCT, monthlyPct: MONTHLY_PCT,
+  reserveLamports: Math.floor((ENTRY * RESERVE_PCT) / 100),
+  monthlyLamports: ENTRY - Math.floor((ENTRY * HOUSE_PCT) / 100) - Math.floor((ENTRY * DAILY_PCT) / 100) - Math.floor((ENTRY * RESERVE_PCT) / 100),
+  housePct: HOUSE_PCT, dailyPct: DAILY_PCT, monthlyPct: MONTHLY_PCT, reservePct: RESERVE_PCT,
   dailySplit: parseSplit(env("DAILY_SPLIT", "50,30,20"), [50, 30, 20]),
   monthlySplit: parseSplit(env("MONTHLY_SPLIT", "50,30,20"), [50, 30, 20]),
   tz: env("POT_TIMEZONE", "America/Chicago"),
@@ -42,7 +46,7 @@ export const SOL = {
   rentMinLamports: 890880,        // a brand-new wallet can't receive less than this
   rpc: env("SOLANA_RPC", "https://api.mainnet-beta.solana.com"),
 };
-if (MONTHLY_PCT < 0) throw new Error("HOUSE_PCT + DAILY_PCT must be 100 or less");
+if (MONTHLY_PCT < 0) throw new Error("HOUSE_PCT + DAILY_PCT + FEE_RESERVE_PCT must be 100 or less");
 
 const db = () => getStore({ name: "astrobit", consistency: "strong" });
 const SYSTEM = "11111111111111111111111111111111";
@@ -85,8 +89,11 @@ export async function verifySolEntry(sig, wallet) {
   const sent = (to) => tx.transaction.message.instructions
     .filter((ix) => ix.programId === SYSTEM && ix.parsed?.type === "transfer" && ix.parsed.info.source === wallet && ix.parsed.info.destination === to)
     .reduce((s, ix) => s + Number(ix.parsed.info.lamports), 0);
-  if (sent(SOL.potWallet) < SOL.potLamports) return "The pot share was not paid";
+  // the prize money must reach the pot wallet; a page loaded just before a split change may send the old split,
+  // which is fine as long as the whole entry was paid between the two wallets
+  if (sent(SOL.potWallet) < SOL.dailyLamports + SOL.monthlyLamports) return "The pot share was not paid";
   if (SOL.houseLamports > 0 && sent(SOL.houseWallet) < SOL.houseLamports) return "The house share was not paid";
+  if (sent(SOL.potWallet) + sent(SOL.houseWallet) < SOL.entryLamports) return "The full entry was not paid";
   return null;
 }
 
@@ -129,7 +136,7 @@ export async function solStatus(store, wallet) {
   const wins = (lb, pot, split) => lb.slice(0, 10).map((r, i) => ({ wallet: r.wallet, score: r.score, wave: r.wave, winsLamports: i < split.length ? Math.floor((pot * split[i]) / 100) : 0 }));
   return {
     config: { mode: "sol", entryLamports: SOL.entryLamports, potWallet: SOL.potWallet, houseWallet: SOL.houseWallet, potLamports: SOL.potLamports, houseLamports: SOL.houseLamports,
-      housePct: SOL.housePct, dailyPct: SOL.dailyPct, monthlyPct: SOL.monthlyPct, dailySplit: SOL.dailySplit, monthlySplit: SOL.monthlySplit, tz: SOL.tz, payoutsOn: SOL.payoutsOn },
+      housePct: SOL.housePct, dailyPct: SOL.dailyPct, monthlyPct: SOL.monthlyPct, reservePct: SOL.reservePct, dailySplit: SOL.dailySplit, monthlySplit: SOL.monthlySplit, tz: SOL.tz, payoutsOn: SOL.payoutsOn },
     today: { day: d, endsAt: dayEndsAt(now), entries: dp.entries, potLamports: dp.lamports, leaderboard: wins(db1, dp.lamports, SOL.dailySplit) },
     month: { month: m, endsAt: monthEndsAt(now), entries: mp.entries, potLamports: mp.lamports, leaderboard: wins(mb, mp.lamports, SOL.monthlySplit) },
     payouts,
