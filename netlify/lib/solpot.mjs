@@ -9,8 +9,10 @@
 // Free games are practice only and never win SOL.
 
 import { getStore } from "@netlify/blobs";
-import { Connection, Keypair, PublicKey, SystemProgram, Transaction, TransactionInstruction } from "@solana/web3.js";
 import bs58 from "bs58";
+import nacl from "tweetnacl";
+// No @solana/web3.js here on purpose: it crashes in Netlify Functions (ESM/CommonJS clash in one of its dependencies),
+// so payouts build and sign plain Solana transactions by hand with tweetnacl.
 
 export const env = (k, d) => (globalThis.Netlify?.env?.get(k) ?? process.env[k] ?? d);
 const int = (v, d) => { const n = Math.floor(Number(v)); return Number.isFinite(n) ? n : d; };
@@ -44,7 +46,7 @@ if (MONTHLY_PCT < 0) throw new Error("HOUSE_PCT + DAILY_PCT must be 100 or less"
 
 const db = () => getStore({ name: "astrobit", consistency: "strong" });
 const SYSTEM = "11111111111111111111111111111111";
-const MEMO = new PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
+const MEMO = "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr";
 
 // ---------- calendar (in POT_TIMEZONE) ----------
 const fmtDay = (tz) => new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });
@@ -143,12 +145,41 @@ export async function recentPayouts(store, n = 10) {
 function loadKeypair() {
   const raw = (env("POT_SECRET_KEY", "") || "").trim();
   if (!raw) return null;
-  const bytes = raw.startsWith("[") ? Uint8Array.from(JSON.parse(raw)) : bs58.decode(raw);
-  const kp = bytes.length === 64 ? Keypair.fromSecretKey(bytes) : bytes.length === 32 ? Keypair.fromSeed(bytes) : null;
+  let bytes;
+  try { bytes = raw.startsWith("[") ? Uint8Array.from(JSON.parse(raw)) : bs58.decode(raw); } catch { throw new Error("POT_SECRET_KEY is not a valid Solana private key"); }
+  const kp = bytes.length === 64 ? nacl.sign.keyPair.fromSecretKey(bytes) : bytes.length === 32 ? nacl.sign.keyPair.fromSeed(bytes) : null;
   if (!kp) throw new Error("POT_SECRET_KEY is not a valid Solana private key");
-  if (kp.publicKey.toBase58() !== SOL.potWallet) throw new Error("POT_SECRET_KEY does not belong to SOL_POT_WALLET — payouts stopped");
-  return kp;
+  const address = bs58.encode(kp.publicKey);
+  if (address !== SOL.potWallet) throw new Error("POT_SECRET_KEY does not belong to SOL_POT_WALLET — payouts stopped");
+  return { secretKey: kp.secretKey, address };
 }
+
+// ---- minimal legacy Solana transaction: payer -> several SOL transfers + memo ----
+const cu16 = (n) => { const out = []; do { let b = n & 0x7f; n >>= 7; if (n) b |= 0x80; out.push(b); } while (n); return out; };
+function payoutTx(kp, blockhash, transfers, memo) {
+  const keys = [kp.address, ...transfers.map((t) => t.to), SYSTEM, MEMO];
+  const idx = (k) => keys.indexOf(k);
+  const bytes = [1, 0, 2];                                            // 1 signer (payer), 0 read-only signers, 2 read-only programs
+  bytes.push(...cu16(keys.length)); keys.forEach((k) => bytes.push(...bs58.decode(k)));
+  bytes.push(...bs58.decode(blockhash));
+  const ixs = transfers.map((t) => {
+    const d = new Uint8Array(12); const v = new DataView(d.buffer); v.setUint32(0, 2, true); v.setBigUint64(4, BigInt(t.lamports), true);
+    return { p: idx(SYSTEM), a: [0, idx(t.to)], d: [...d] };
+  });
+  ixs.push({ p: idx(MEMO), a: [], d: [...new TextEncoder().encode(memo)] });
+  bytes.push(...cu16(ixs.length));
+  for (const ix of ixs) { bytes.push(ix.p, ...cu16(ix.a.length), ...ix.a, ...cu16(ix.d.length), ...ix.d); }
+  const message = Uint8Array.from(bytes);
+  const sig = nacl.sign.detached(message, kp.secretKey);
+  return { sig: bs58.encode(sig), raw: Uint8Array.from([...cu16(1), ...sig, ...message]) };
+}
+const rpcConn = {
+  getBalance: async (addr) => (await rpc("getBalance", [addr, { commitment: "confirmed" }])).value,
+  getLatestBlockhash: async () => (await rpc("getLatestBlockhash", [{ commitment: "confirmed" }])).value,
+  getBlockHeight: async () => rpc("getBlockHeight", [{ commitment: "confirmed" }]),
+  getSignatureStatus: async (sig, history = false) => (await rpc("getSignatureStatuses", [[sig], { searchTransactionHistory: history }])).value[0],
+  send: async (raw) => rpc("sendTransaction", [Buffer.from(raw).toString("base64"), { encoding: "base64", skipPreflight: false, maxRetries: 5 }]),
+};
 
 async function settle(store, conn, kp, kind, period, log) {
   const key = `sol/payout/${kind}/${period}`;
@@ -156,11 +187,11 @@ async function settle(store, conn, kp, kind, period, log) {
   if (rec && (rec.status === "done" || rec.status === "rolled" || rec.status === "held")) return;
 
   if (rec && rec.status === "sent") {
-    const st = (await conn.getSignatureStatuses([rec.sig], { searchTransactionHistory: true })).value[0];
+    const st = await conn.getSignatureStatus(rec.sig, true);
     if (st && !st.err && (st.confirmationStatus === "confirmed" || st.confirmationStatus === "finalized")) {
       rec.status = "done"; rec.paidAt = Date.now(); await store.setJSON(key, rec); log(`${kind} ${period}: confirmed ${rec.sig}`); return;
     }
-    const height = await conn.getBlockHeight("confirmed");
+    const height = await conn.getBlockHeight();
     if (!st && height <= rec.lastValidBlockHeight) { log(`${kind} ${period}: still waiting for ${rec.sig}`); return; }
     if (st && st.err) log(`${kind} ${period}: payment failed on-chain, retrying`); else log(`${kind} ${period}: payment expired unseen, retrying`);
     // fall through and send again with the same winners and amounts
@@ -178,7 +209,7 @@ async function settle(store, conn, kp, kind, period, log) {
       const amount = Math.floor((pot * split[i]) / 100);
       if (amount <= 0) continue;
       if (amount < SOL.rentMinLamports) {
-        const bal = await conn.getBalance(new PublicKey(lb[i].wallet), "confirmed");
+        const bal = await conn.getBalance(lb[i].wallet);
         if (bal === 0) { log(`${kind} ${period}: #${i + 1} wallet is empty and prize is too small for a new account — rolled over`); continue; }
       }
       winners.push({ rank: i + 1, wallet: lb[i].wallet, score: lb[i].score, lamports: amount });
@@ -194,22 +225,19 @@ async function settle(store, conn, kp, kind, period, log) {
   }
 
   const total = rec.winners.reduce((s, w) => s + w.lamports, 0);
-  const bal = await conn.getBalance(kp.publicKey, "confirmed");
+  const bal = await conn.getBalance(kp.address);
   if (bal < total + 20000) { await store.setJSON(key, { ...rec, status: "pending", reason: "pot wallet balance too low" }); log(`${kind} ${period}: pot wallet has ${bal}, needs ${total}`); return; }
 
-  const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash("confirmed");
-  const tx = new Transaction({ feePayer: kp.publicKey, recentBlockhash: blockhash });
-  for (const w of rec.winners) tx.add(SystemProgram.transfer({ fromPubkey: kp.publicKey, toPubkey: new PublicKey(w.wallet), lamports: w.lamports }));
-  tx.add(new TransactionInstruction({ programId: MEMO, keys: [], data: Buffer.from(`Rumple's AstroBit ${kind === "day" ? "daily" : "monthly"} pot ${period}`) }));
-  tx.sign(kp);
-  const sig = bs58.encode(tx.signature);
+  const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash();
+  const tx = payoutTx(kp, blockhash, rec.winners.map((w) => ({ to: w.wallet, lamports: w.lamports })), `Rumple's AstroBit ${kind === "day" ? "daily" : "monthly"} pot ${period}`);
+  const sig = tx.sig;
   rec = { ...rec, status: "sent", sig, lastValidBlockHeight, sentAt: Date.now() };
   await store.setJSON(key, rec);           // saved BEFORE sending, so a crash can never pay twice
-  await conn.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 5 });
+  await conn.send(tx.raw);
   log(`${kind} ${period}: sent ${total} lamports to ${rec.winners.length} winner(s), ${sig}`);
   for (let i = 0; i < 20; i++) {
     await new Promise((r) => setTimeout(r, 1500));
-    const st = (await conn.getSignatureStatuses([sig])).value[0];
+    const st = await conn.getSignatureStatus(sig);
     if (st && !st.err && (st.confirmationStatus === "confirmed" || st.confirmationStatus === "finalized")) { rec.status = "done"; rec.paidAt = Date.now(); await store.setJSON(key, rec); log(`${kind} ${period}: confirmed`); return; }
     if (st && st.err) return; // next run retries
   }
@@ -221,7 +249,7 @@ export async function runPayouts() {
   if (!SOL.payoutsOn) { log("PAYOUTS=off, skipping"); return out; }
   const kp = loadKeypair();
   if (!kp) { log("POT_SECRET_KEY not set, skipping"); return out; }
-  const conn = new Connection(SOL.rpc, "confirmed");
+  const conn = rpcConn;
   const store = db();
   const cut = Date.now() - SOL.graceMs;
   const doneDay = dayId(cut), doneMonth = monthId(cut);
