@@ -167,7 +167,7 @@
     <div class="card solmode">
       <h3>ASTROBIT SOL POTS</h3>
       <div class="pots2"><div><small>TODAY'S POT</small><b id="sPotD">—</b><small class="end" id="sEndD"></small></div><div><small>THIS MONTH'S POT</small><b id="sPotM">—</b><small class="end" id="sEndM"></small></div></div>
-      <small style="color:var(--mute);display:block;line-height:1.5"><span id="sEntry">0.001</span> SOL per game · <span id="sPcts">60% to today's pot, 30% to the month's pot, 10% to site upkeep</span> · top 3 split each pot 50/30/20, paid automatically after the day or month ends.</small>
+      <small style="color:var(--mute);display:block;line-height:1.5"><span id="sEntry">0.001</span> SOL per game · <span id="sPcts">60% to today's pot, 30% to the month's pot, 1% kept for payout fees, 9% to site upkeep</span> · top 3 split each pot 50/30/20, paid automatically after the day or month ends.</small>
     </div>
     <div class="card solmode">
       <h3>TOP PILOTS · TODAY</h3>
@@ -510,7 +510,7 @@ function renderSol(st){
   $("sEndD").textContent = untilTxt(st.today.endsAt) + " · " + st.today.entries + " paid";
   $("sEndM").textContent = untilTxt(st.month.endsAt) + " · " + st.month.entries + " paid";
   $("sEntry").textContent = entrySol();
-  $("sPcts").textContent = `${st.config.dailyPct}% to today's pot, ${st.config.monthlyPct}% to the month's pot, ${st.config.housePct}% to site upkeep`;
+  $("sPcts").textContent = `${st.config.dailyPct}% to today's pot, ${st.config.monthlyPct}% to the month's pot, ${st.config.reservePct ? `${st.config.reservePct}% kept for payout fees, ` : ""}${st.config.housePct}% to site upkeep`;
   const rows = (lb, empty) => !lb.length ? `<tr><td colspan="4" style="color:var(--mute)">${empty}</td></tr>` :
     lb.map((r,i)=>`<tr class="${r.wallet===S.pk?"me":""}"><td class="n">${i+1}</td><td title="${r.wallet}">${short(r.wallet)}</td><td class="s">${fmt(r.score)}</td><td class="s">${r.winsLamports?solTxt(r.winsLamports):"—"}</td></tr>`).join("");
   $("sLbD").innerHTML = rows(st.today.leaderboard, "No paid scores yet today — be the first.");
